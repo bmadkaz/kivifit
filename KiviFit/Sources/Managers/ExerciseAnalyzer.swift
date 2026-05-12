@@ -156,14 +156,15 @@ final class ExerciseAnalyzer {
         }
 
         // ── 2. Knee valgus (cave inward) ───────────────────────────────────
-        // World coords, mirrored front camera: leftHip.x > 0, rightHip.x < 0.
-        // Left valgus  → leftKnee.x  < leftAnkle.x  (knee moves toward centre)
-        // Right valgus → rightKnee.x > rightAnkle.x (knee moves toward centre)
+        // Sign-convention-independent check: valgus means the knee X is
+        // closer to the centre (|knee.x| < |ankle.x|) because the ankle
+        // stays planted while the knee drifts inward toward x = 0.
+        // Works regardless of camera mirroring or MediaPipe's left/right labelling.
         if isSquatting && avg < 145 {
             let hipW   = max(0.05, abs(lm(lms, .rightHip).x - lm(lms, .leftHip).x))
-            let thresh = hipW * 0.12
-            let lCave  = lm(lms, .leftAnkle).x  - lm(lms, .leftKnee).x  > thresh
-            let rCave  = lm(lms, .rightKnee).x  - lm(lms, .rightAnkle).x > thresh
+            let thresh = hipW * 0.15
+            let lCave  = abs(lm(lms, .leftKnee).x)  < abs(lm(lms, .leftAnkle).x)  - thresh
+            let rCave  = abs(lm(lms, .rightKnee).x) < abs(lm(lms, .rightAnkle).x) - thresh
             if lCave || rCave {
                 let phaseHint = squatPhase == .descending ? "на спуске" : "на подъёме"
                 errors.append(FormError(
