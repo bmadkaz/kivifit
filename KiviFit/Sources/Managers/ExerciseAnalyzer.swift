@@ -24,6 +24,13 @@ struct FormError {
 
 final class ExerciseAnalyzer {
 
+    // MARK: - Squat phase state
+    private enum SquatPhase { case standing, descending, ascending }
+    private var squatPhase: SquatPhase = .standing
+    private var squatPrevAngle: Float  = 180   // knee angle previous frame
+    private var squatMinAngle: Float   = 180   // lowest angle reached in current rep
+    private var squatDepthChecked: Bool = false // depth already evaluated this rep
+
     // MARK: - Landmark indices (MediaPipe 33-point schema)
     private enum LM: Int {
         case nose = 0
@@ -92,45 +99,74 @@ final class ExerciseAnalyzer {
         let rKnee = angle(a: lm(lms, .rightHip), b: lm(lms, .rightKnee), c: lm(lms, .rightAnkle))
         let avg   = (lKnee + rKnee) / 2
 
-        // Only analyze form when knees are actually bending
-        let isSquatting = avg < 155
+        // ── Phase detection ────────────────────────────────────────────────
+        // Uses a 2°-hysteresis delta so noise doesn't flip the phase.
+        let prevPhase = squatPhase
+        let delta     = avg - squatPrevAngle   // positive = angle opening = going up
 
-        // 1. Depth: knees bent but hips still above parallel
-        //    Parallel ≈ 90°. Threshold 115° gives some tolerance.
-        if isSquatting && avg > 115 {
-            errors.append(FormError(
-                message: "Глубже — опустите бёдра ниже уровня колен",
-                severity: .warning))
+        if avg >= 155 {
+            // Back to standing: reset rep state
+            if squatPhase != .standing {
+                squatMinAngle    = 180
+                squatDepthChecked = false
+            }
+            squatPhase = .standing
+        } else if delta < -2 {
+            squatPhase = .descending
+        } else if delta > 2 {
+            squatPhase = .ascending
+        }
+        // Track minimum angle throughout the rep
+        if squatPhase != .standing {
+            squatMinAngle = min(squatMinAngle, avg)
+        }
+        squatPrevAngle = avg
+
+        let justReachedBottom = prevPhase == .descending && squatPhase == .ascending
+        let isSquatting       = squatPhase != .standing
+
+        // ── 1. Depth ────────────────────────────────────────────────────────
+        // Checked exactly once per rep, at the moment the person starts
+        // coming up (transition descending → ascending).
+        // Target: knee angle ≤ 80° (proper squat depth).
+        if justReachedBottom && !squatDepthChecked {
+            squatDepthChecked = true
+            if squatMinAngle > 80 {
+                errors.append(FormError(
+                    message: "Недостаточная глубина — присядьте до 80–70° (бёдра ниже колен)",
+                    severity: .warning))
+            }
         }
 
-        // 2. Knee valgus (cave inward).
-        //    Threshold is proportional to the person's hip width,
-        //    so it works regardless of build.
+        // ── 2. Knee valgus (cave inward) ───────────────────────────────────
+        // Relevant on the way DOWN (most dangerous phase) and on the way UP
+        // (common to cave when fatigued). Not checked while standing.
         if isSquatting {
-            let hipW = max(0.05, abs(lm(lms, .rightHip).x - lm(lms, .leftHip).x))
+            let hipW   = max(0.05, abs(lm(lms, .rightHip).x - lm(lms, .leftHip).x))
             let thresh = hipW * 0.12
-            // Left knee should stay to the LEFT of left ankle (larger X = right side of image)
-            let lCave = lm(lms, .leftKnee).x  - lm(lms, .leftAnkle).x  >  thresh
-            // Right knee should stay to the RIGHT of right ankle
-            let rCave = lm(lms, .rightAnkle).x - lm(lms, .rightKnee).x >  thresh
+            let lCave  = lm(lms, .leftKnee).x  - lm(lms, .leftAnkle).x  >  thresh
+            let rCave  = lm(lms, .rightAnkle).x - lm(lms, .rightKnee).x >  thresh
             if lCave || rCave {
+                let phaseHint = squatPhase == .descending ? "на спуске" : "на подъёме"
                 errors.append(FormError(
-                    message: "Колени завалились внутрь — разведите их по направлению носков",
+                    message: "Колени завалились внутрь \(phaseHint) — разведите их по носкам",
                     severity: .critical))
             }
         }
 
-        // 3. Excessive forward lean.
-        //    Some lean is normal (20–40°). Over 50° is problematic.
+        // ── 3. Forward lean ────────────────────────────────────────────────
+        // Some lean is normal (20–40°). Over 50° is problematic.
+        // Check only while squatting — lean naturally increases at bottom.
         if isSquatting && spineLean(lms) > 50 {
+            let phaseHint = squatPhase == .descending ? "на спуске" : "на подъёме"
             errors.append(FormError(
-                message: "Чрезмерный наклон корпуса вперёд",
+                message: "Чрезмерный наклон корпуса вперёд \(phaseHint)",
                 severity: .warning))
         }
 
-        // 4. Heel lift.
-        //    In world Y-up coords: heel point is behind the foot.
-        //    When the heel rises off the floor, heel.y > footIndex.y.
+        // ── 4. Heel lift ───────────────────────────────────────────────────
+        // Checked in ALL phases including standing — heel can lift even
+        // before the squat begins if mobility is limited.
         let lHeelUp = lm(lms, .leftHeel).y  - lm(lms, .leftFootIndex).y  > 0.04
         let rHeelUp = lm(lms, .rightHeel).y - lm(lms, .rightFootIndex).y > 0.04
         if lHeelUp || rHeelUp {
