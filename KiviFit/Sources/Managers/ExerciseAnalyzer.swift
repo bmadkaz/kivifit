@@ -29,11 +29,10 @@ final class ExerciseAnalyzer {
     private var squatPhase: SquatPhase = .standing
     private var squatPrevAngle: Float  = 180   // knee angle previous frame
     private var squatMinAngle: Float   = 180   // lowest angle reached in current rep
-    private var squatDepthChecked: Bool = false // depth already evaluated this rep
     // Errors are suppressed until the first complete rep (down + back to standing)
     // to prevent false positives at startup or when the camera catches a partial body.
     private var squatRepConfirmed: Bool = false
-    private var squatHasDescended: Bool = false // went below 145° at least once this rep
+    private var squatHasDescended: Bool = false  // went below 145° at least once this rep
 
     // MARK: - Landmark indices (MediaPipe 33-point schema)
     private enum LM: Int {
@@ -119,7 +118,6 @@ final class ExerciseAnalyzer {
                     squatRepConfirmed = true
                 }
                 squatMinAngle     = 180
-                squatDepthChecked = false
                 squatHasDescended = false
             }
             squatPhase = .standing
@@ -137,33 +135,20 @@ final class ExerciseAnalyzer {
 
         squatPrevAngle = avg
 
-        let justReachedBottom = prevPhase == .descending && squatPhase == .ascending
-        let isSquatting       = squatPhase != .standing
+        let isSquatting = squatPhase != .standing
 
         // Suppress all errors until the first complete rep is confirmed.
         guard squatRepConfirmed else { return [] }
 
-        // ── 1. Depth ────────────────────────────────────────────────────────
-        // Checked exactly once per rep, at the moment the person starts
-        // coming up (transition descending → ascending).
-        // Target: knee angle ≤ 80° (proper squat depth).
-        if justReachedBottom && !squatDepthChecked {
-            squatDepthChecked = true
-            if squatMinAngle > 80 {
-                errors.append(FormError(
-                    message: "Недостаточная глубина — присядьте до 80–70° (бёдра ниже колен)",
-                    severity: .warning))
-            }
-        }
-
-        // ── 2. Knee valgus (cave inward) ───────────────────────────────────
-        // Relevant on the way DOWN (most dangerous phase) and on the way UP
-        // (common to cave when fatigued). Not checked while standing.
+        // ── 1. Knee valgus (cave inward) ───────────────────────────────────
+        // World coords, mirrored front camera: leftHip.x > 0, rightHip.x < 0.
+        // Left valgus  → leftKnee.x  < leftAnkle.x  (knee moves toward centre)
+        // Right valgus → rightKnee.x > rightAnkle.x (knee moves toward centre)
         if isSquatting && avg < 145 {
             let hipW   = max(0.05, abs(lm(lms, .rightHip).x - lm(lms, .leftHip).x))
             let thresh = hipW * 0.12
-            let lCave  = lm(lms, .leftKnee).x  - lm(lms, .leftAnkle).x  >  thresh
-            let rCave  = lm(lms, .rightAnkle).x - lm(lms, .rightKnee).x >  thresh
+            let lCave  = lm(lms, .leftAnkle).x  - lm(lms, .leftKnee).x  > thresh
+            let rCave  = lm(lms, .rightKnee).x  - lm(lms, .rightAnkle).x > thresh
             if lCave || rCave {
                 let phaseHint = squatPhase == .descending ? "на спуске" : "на подъёме"
                 errors.append(FormError(
