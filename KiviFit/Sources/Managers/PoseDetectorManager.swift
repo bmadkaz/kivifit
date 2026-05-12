@@ -54,9 +54,8 @@ final class PoseDetectorManager: NSObject {
         }
 
         do {
-            let baseOptions = BaseOptions(modelAssetPath: modelPath)
-            // Force GPU (Metal) delegate for iOS
-            baseOptions.delegate = .GPU
+            let baseOptions = BaseOptions()
+            baseOptions.modelAssetPath = modelPath
 
             let options = PoseLandmarkerOptions()
             options.baseOptions = baseOptions
@@ -84,8 +83,8 @@ final class PoseDetectorManager: NSObject {
             return
         }
         do {
-            let baseOptions = BaseOptions(modelAssetPath: modelPath)
-            baseOptions.delegate = .GPU
+            let baseOptions = BaseOptions()
+            baseOptions.modelAssetPath = modelPath
             let options = PoseLandmarkerOptions()
             options.baseOptions = baseOptions
             options.runningMode = .video
@@ -132,15 +131,15 @@ final class PoseDetectorManager: NSObject {
             let normalized = poseLandmarks.map { lm in
                 NormalizedLandmark(
                     x: lm.x, y: lm.y, z: lm.z,
-                    visibility: lm.visibility ?? 0,
-                    presence: lm.presence ?? 0
+                    visibility: lm.visibility?.floatValue ?? 0,
+                    presence: lm.presence?.floatValue ?? 0
                 )
             }
             let world = worldLandmarks.map { lm in
                 NormalizedLandmark(
                     x: lm.x, y: lm.y, z: lm.z,
-                    visibility: lm.visibility ?? 0,
-                    presence: lm.presence ?? 0
+                    visibility: lm.visibility?.floatValue ?? 0,
+                    presence: lm.presence?.floatValue ?? 0
                 )
             }
 
