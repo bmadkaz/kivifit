@@ -2,78 +2,75 @@ workflows:
   kivifit-unsigned-ipa:
     name: KiviFit — Unsigned IPA (Sideloadly)
     max_build_duration: 60
-    instance_type: mac_mini_m1
+    instance_type: mac_mini_m2
 
     environment:
       xcode: 16.2
       cocoapods: default
       vars:
-        BUNDLE_ID: "com.kivifit.app"
         APP_NAME: "KiviFit"
-        XCODE_PROJECT: "KiviFit.xcodeproj"
+        XCODE_WORKSPACE: "KiviFit.xcworkspace"
         XCODE_SCHEME: "KiviFit"
+        BUILD_DIR: "build/ios"
 
     scripts:
       - name: Install CocoaPods dependencies
         script: |
+          set -e
           pod install --repo-update
+          echo "Workspace created: $(ls -la KiviFit.xcworkspace 2>/dev/null && echo YES || echo NO)"
 
-      - name: Download MediaPipe model (heavy)
+      - name: Download MediaPipe models
         script: |
+          set -e
           mkdir -p KiviFit/Resources
-          # Download pose_landmarker_heavy.task from MediaPipe releases
-          curl -L "https://storage.googleapis.com/mediapipe-models/pose_landmarker/pose_landmarker_heavy/float16/latest/pose_landmarker_heavy.task" \
+          curl -fL "https://storage.googleapis.com/mediapipe-models/pose_landmarker/pose_landmarker_heavy/float16/latest/pose_landmarker_heavy.task" \
             -o KiviFit/Resources/pose_landmarker_heavy.task
-          # Download lite as fallback
-          curl -L "https://storage.googleapis.com/mediapipe-models/pose_landmarker/pose_landmarker_lite/float16/latest/pose_landmarker_lite.task" \
+          curl -fL "https://storage.googleapis.com/mediapipe-models/pose_landmarker/pose_landmarker_lite/float16/latest/pose_landmarker_lite.task" \
             -o KiviFit/Resources/pose_landmarker_lite.task
-          echo "Models downloaded:"
           ls -lh KiviFit/Resources/
 
-      - name: Build unsigned IPA (no code signing)
+      - name: Build unsigned (no code signing)
         script: |
+          set -e
           set -o pipefail
+
           xcodebuild \
-            -workspace KiviFit.xcworkspace \
+            -workspace "$XCODE_WORKSPACE" \
             -scheme "$XCODE_SCHEME" \
             -configuration Release \
             -sdk iphoneos \
-            -destination "generic/platform=iOS" \
+            -derivedDataPath "$BUILD_DIR" \
             CODE_SIGN_IDENTITY="" \
             CODE_SIGNING_REQUIRED=NO \
             CODE_SIGNING_ALLOWED=NO \
             ONLY_ACTIVE_ARCH=NO \
-            clean build \
-            -derivedDataPath DerivedData
+            build
 
       - name: Package unsigned IPA
         script: |
           set -e
-          echo "=== DerivedData .app candidates ==="
-          find DerivedData -name "*.app" -type d 2>/dev/null || true
 
-          APP_PATH=$(find DerivedData/Build/Products -name "*.app" -not -path "*/PlugIns/*" -type d | head -1)
+          APP_PATH=$(find "$BUILD_DIR/Build/Products/Release-iphoneos" \
+            -maxdepth 1 -name "*.app" -type d | head -1)
 
           if [ -z "$APP_PATH" ]; then
-            echo "ERROR: No .app bundle found in DerivedData/Build/Products"
-            echo "=== Full DerivedData/Build/Products tree ==="
-            find DerivedData/Build/Products -maxdepth 4 2>/dev/null || true
+            echo "ERROR: .app not found. Contents of Build/Products:"
+            find "$BUILD_DIR/Build/Products" -maxdepth 3 2>/dev/null || true
             exit 1
           fi
 
-          echo "Found app: $APP_PATH"
-          mkdir -p Payload
+          echo "Packaging: $APP_PATH"
+          rm -rf Payload
+          mkdir Payload
           cp -r "$APP_PATH" Payload/
-          zip -r "${APP_NAME}-unsigned.ipa" Payload/
-          echo "IPA size: $(du -sh ${APP_NAME}-unsigned.ipa | cut -f1)"
-
-      - name: Verify IPA
-        script: |
-          unzip -l "${APP_NAME}-unsigned.ipa" | head -30
+          zip -qr "${APP_NAME}-unsigned.ipa" Payload/
+          rm -rf Payload
+          ls -lh "${APP_NAME}-unsigned.ipa"
 
     artifacts:
       - "*.ipa"
-      - DerivedData/Logs/**/*.log
+      - "$BUILD_DIR/Logs/**/*.log"
 
     publishing:
       email:
