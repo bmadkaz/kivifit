@@ -79,7 +79,8 @@ final class CameraManager: NSObject {
         }
 
         self.videoDataOutput = output
-        imageSize = CGSize(width: 480, height: 360)
+        // After videoOrientation = .portrait the buffer is portrait: 360×480
+        imageSize = CGSize(width: 360, height: 480)
 
         captureSession.commitConfiguration()
         captureSession.startRunning()

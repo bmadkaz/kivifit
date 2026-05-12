@@ -10,7 +10,7 @@ final class WorkoutViewModel: NSObject, ObservableObject {
     @Published var fps: Int = 0
     @Published var processingStatus: String = "Инициализация..."
     @Published var selectedExercise: Exercise = .squat
-    @Published var imageSize: CGSize = CGSize(width: 480, height: 360)
+    @Published var imageSize: CGSize = CGSize(width: 360, height: 480)
 
     // MARK: - Services
     let captureSession: AVCaptureSession
