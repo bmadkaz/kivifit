@@ -72,16 +72,57 @@ final class ExerciseAnalyzer {
                      presence:   min(a.presence,   b.presence))
     }
 
-    /// Spine lean from vertical in degrees.
-    /// Forward lean (toward camera) → positive value.
-    /// Straight upright → ~0°.
+    /// Spine lean from vertical in degrees (sagittal plane, Z-Y).
+    /// Upright → ~0°. Excessive forward lean → larger values.
     private func spineLean(_ lms: [PoseLandmark]) -> Float {
         let hip      = mid(lm(lms, .leftHip),      lm(lms, .rightHip))
         let shoulder = mid(lm(lms, .leftShoulder), lm(lms, .rightShoulder))
-        let dz = shoulder.z - hip.z   // forward lean → shoulder closer to camera
-        let dy = shoulder.y - hip.y   // vertical rise (should be positive)
+        let dz = shoulder.z - hip.z
+        let dy = shoulder.y - hip.y
         guard abs(dy) > 0.01 else { return 90 }
         return atan2(abs(dz), abs(dy)) * (180 / .pi)
+    }
+
+    /// Frontal Plane Projection Angle (FPPA) at the knee.
+    /// Projects hip→knee→ankle onto the X-Y (frontal) plane — ignores Z depth.
+    /// Straight alignment → ~180°. Any lateral deviation → smaller angle.
+    private func fppa(hip: PoseLandmark, knee: PoseLandmark, ankle: PoseLandmark) -> Float {
+        let toHip   = SIMD2<Float>(hip.x   - knee.x, hip.y   - knee.y)
+        let toAnkle = SIMD2<Float>(ankle.x - knee.x, ankle.y - knee.y)
+        let lenH = simd_length(toHip),  lenA = simd_length(toAnkle)
+        guard lenH > 1e-4, lenA > 1e-4 else { return 180 }
+        let cosVal = simd_dot(toHip, toAnkle) / (lenH * lenA)
+        return acos(max(-1, min(1, cosVal))) * (180 / .pi)
+    }
+
+    /// Returns true when the knee is on the MEDIAL side (toward hip midline) of the
+    /// ankle→hip axis — i.e., true knee valgus, not varus.
+    /// Uses the cross product sign compared to the midHip direction to determine
+    /// "medial" without depending on the coordinate sign convention.
+    private func isKneeMedial(hip: PoseLandmark, knee: PoseLandmark,
+                               ankle: PoseLandmark, midHip: PoseLandmark,
+                               deviationThreshold: Float) -> Bool {
+        // Ankle→Hip axis in frontal plane
+        let axX = hip.x - ankle.x
+        let axY = hip.y - ankle.y
+        // Ankle→Knee vector
+        let akX = knee.x - ankle.x
+        let akY = knee.y - ankle.y
+        // Ankle→MidHip vector (always points medially)
+        let amX = midHip.x - ankle.x
+        let amY = midHip.y - ankle.y
+
+        // Signed perpendicular deviation of knee from the ankle-hip axis
+        let crossKnee = axX * akY - axY * akX   // knee side
+        let crossMid  = axX * amY - axY * amX   // medial reference side
+
+        // Knee is medial if it is on the same side as midHip
+        guard crossMid * crossKnee > 0 else { return false }
+
+        // Magnitude of perpendicular deviation (metres)
+        let legLen = sqrt(axX * axX + axY * axY) + 1e-8
+        let deviation = abs(crossKnee) / legLen
+        return deviation > deviationThreshold
     }
 
     // MARK: - Public entry point
@@ -104,6 +145,7 @@ final class ExerciseAnalyzer {
         let keyIndices: [LM] = [.leftHip, .rightHip, .leftKnee, .rightKnee, .leftAnkle, .rightAnkle]
         guard keyIndices.allSatisfy({ lms[$0.rawValue].visibility > 0.5 }) else { return [] }
 
+        // 3-D knee flexion angle (hip→knee→ankle) used for phase/depth.
         let lKneeAng = angle(a: lm(lms, .leftHip),  b: lm(lms, .leftKnee),  c: lm(lms, .leftAnkle))
         let rKneeAng = angle(a: lm(lms, .rightHip), b: lm(lms, .rightKnee), c: lm(lms, .rightAnkle))
         let avg      = (lKneeAng + rKneeAng) / 2
@@ -111,7 +153,6 @@ final class ExerciseAnalyzer {
         // ── Phase detection (2° hysteresis) ──────────────────────────────────
         let prevPhase = squatPhase
         let delta     = avg - squatPrevAngle
-
         var repJustCompleted = false
 
         if avg >= 155 {
@@ -120,16 +161,12 @@ final class ExerciseAnalyzer {
                     squatRepConfirmed = true
                     repJustCompleted  = true
                 }
-                // squatMinAngle is read for depth BEFORE this block (at justReachedBottom),
-                // so reset here is safe.
                 squatMinAngle     = 180
                 squatHasDescended = false
             }
             squatPhase = .standing
         } else if delta < -2 {
             if prevPhase == .standing {
-                // New rep starting — reset per-rep accumulators
-                repHadValgus      = false
                 repHadHeelLift    = false
                 repHadForwardLean = false
                 repValgusFrames   = 0
@@ -150,8 +187,46 @@ final class ExerciseAnalyzer {
 
         var errors: [FormError] = []
 
-        // ── Depth + lean: fire immediately when ascending starts ─────────────
+        // ── Accumulate per-frame flags in bottom zone (avg < 130°) ───────────
+        // 130° ≈ early squat depth where form errors become relevant.
+        if squatPhase != .standing && avg < 130 {
+            repBottomFrames += 1
+
+            // Knee valgus via two complementary methods (both must agree):
+            //   1. FPPA < 170° — any lateral deviation from hip-knee-ankle line
+            //      in the frontal plane (Z ignored). Clinical threshold: <175°.
+            //      Using 170° for noise margin.
+            //   2. isKneeMedial — cross-product confirms the knee went INWARD
+            //      (toward hip midline), not outward (varus). Sign-convention-free.
+            let midHip = mid(lm(lms, .leftHip), lm(lms, .rightHip))
+            let hipW   = max(0.05, abs(lm(lms, .leftHip).x - lm(lms, .rightHip).x))
+            let valgusThresh = hipW * 0.10   // ~10% hip width ≈ 2-3 cm
+
+            let lFPPA = fppa(hip: lm(lms, .leftHip),  knee: lm(lms, .leftKnee),  ankle: lm(lms, .leftAnkle))
+            let rFPPA = fppa(hip: lm(lms, .rightHip), knee: lm(lms, .rightKnee), ankle: lm(lms, .rightAnkle))
+            let lMedial = isKneeMedial(hip: lm(lms, .leftHip),  knee: lm(lms, .leftKnee),
+                                       ankle: lm(lms, .leftAnkle),  midHip: midHip,
+                                       deviationThreshold: valgusThresh)
+            let rMedial = isKneeMedial(hip: lm(lms, .rightHip), knee: lm(lms, .rightKnee),
+                                       ankle: lm(lms, .rightAnkle), midHip: midHip,
+                                       deviationThreshold: valgusThresh)
+
+            let lValgus = lFPPA < 170 && lMedial
+            let rValgus = rFPPA < 170 && rMedial
+            if lValgus || rValgus { repValgusFrames += 1 }
+
+            // Heel rise: heel Y above foot-index Y means heel is off the floor.
+            let lHeelUp = lm(lms, .leftHeel).y  - lm(lms, .leftFootIndex).y  > 0.03
+            let rHeelUp = lm(lms, .rightHeel).y - lm(lms, .rightFootIndex).y > 0.03
+            if lHeelUp || rHeelUp { repHadHeelLift = true }
+
+            // Forward lean: spine angle from vertical > 45° (research threshold).
+            if spineLean(lms) > 45 { repHadForwardLean = true }
+        }
+
+        // ── Depth + lean: fire immediately at bottom (descending→ascending) ──
         if justReachedBottom {
+            // Depth: knee flexion should reach ≤ 90° for thighs parallel.
             if squatMinAngle > 90 {
                 errors.append(FormError(
                     message: "Недостаточная глубина — опустите бёдра до параллели с полом",
@@ -159,38 +234,22 @@ final class ExerciseAnalyzer {
             }
             if repHadForwardLean {
                 errors.append(FormError(
-                    message: "Чрезмерный наклон корпуса вперёд",
+                    message: "Чрезмерный наклон корпуса вперёд — держите спину прямее",
                     severity: .warning))
             }
         }
 
-        // ── Accumulate form flags in the bottom zone (avg < 130°) ─────────────
-        if squatPhase != .standing && avg < 130 {
-            repBottomFrames += 1
-
-            let hipW   = max(0.05, abs(lm(lms, .rightHip).x - lm(lms, .leftHip).x))
-            let thresh = hipW * 0.18
-            let lCave  = abs(lm(lms, .leftKnee).x)  < abs(lm(lms, .leftAnkle).x)  - thresh
-            let rCave  = abs(lm(lms, .rightKnee).x) < abs(lm(lms, .rightAnkle).x) - thresh
-            if lCave || rCave { repValgusFrames += 1 }
-
-            let lHeelUp = lm(lms, .leftHeel).y  - lm(lms, .leftFootIndex).y  > 0.04
-            let rHeelUp = lm(lms, .rightHeel).y - lm(lms, .rightFootIndex).y > 0.04
-            if lHeelUp || rHeelUp { repHadHeelLift = true }
-
-            if spineLean(lms) > 50 { repHadForwardLean = true }
-        }
-
-        // ── Form errors: fire at rep completion ───────────────────────────────
+        // ── Valgus + heel: fire at rep completion ─────────────────────────────
         if repJustCompleted {
-            if repBottomFrames > 0 && repValgusFrames > repBottomFrames * 2 / 5 {
+            // Valgus present in >35% of bottom frames = persistent, not transient.
+            if repBottomFrames > 0 && repValgusFrames * 100 / repBottomFrames > 35 {
                 errors.append(FormError(
                     message: "Колени завалились внутрь — разведите их по носкам",
                     severity: .critical))
             }
             if repHadHeelLift {
                 errors.append(FormError(
-                    message: "Пятки отрывались от пола",
+                    message: "Пятки отрывались от пола — разработайте подвижность голеностопа",
                     severity: .critical))
             }
         }
