@@ -22,20 +22,20 @@
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
-		A001 /* KiviFitApp.swift */            = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KiviFitApp.swift; sourceTree = "<group>"; };
-		A002 /* ContentView.swift */           = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
-		A003 /* HomeView.swift */              = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HomeView.swift; sourceTree = "<group>"; };
-		A004 /* WorkoutView.swift */           = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkoutView.swift; sourceTree = "<group>"; };
-		A005 /* SkeletonOverlayView.swift */   = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SkeletonOverlayView.swift; sourceTree = "<group>"; };
-		A006 /* CameraPreviewView.swift */     = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CameraPreviewView.swift; sourceTree = "<group>"; };
-		A007 /* PoseDetectorManager.swift */   = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PoseDetectorManager.swift; sourceTree = "<group>"; };
-		A008 /* CameraManager.swift */         = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CameraManager.swift; sourceTree = "<group>"; };
-		A009 /* ExerciseAnalyzer.swift */      = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExerciseAnalyzer.swift; sourceTree = "<group>"; };
-		A010 /* VoiceCoach.swift */            = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VoiceCoach.swift; sourceTree = "<group>"; };
-		A011 /* PermissionManager.swift */     = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PermissionManager.swift; sourceTree = "<group>"; };
-		A012 /* WorkoutViewModel.swift */      = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkoutViewModel.swift; sourceTree = "<group>"; };
-		APPREF /* KiviFit.app */               = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = KiviFit.app; sourceTree = BUILT_PRODUCTS_DIR; };
-		PLISTREF /* Info.plist */              = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = "Info.plist"; sourceTree = "<group>"; };
+		A001 /* KiviFitApp.swift */          = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KiviFitApp.swift; sourceTree = "<group>"; };
+		A002 /* ContentView.swift */         = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
+		A003 /* HomeView.swift */            = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HomeView.swift; sourceTree = "<group>"; };
+		A004 /* WorkoutView.swift */         = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkoutView.swift; sourceTree = "<group>"; };
+		A005 /* SkeletonOverlayView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SkeletonOverlayView.swift; sourceTree = "<group>"; };
+		A006 /* CameraPreviewView.swift */   = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CameraPreviewView.swift; sourceTree = "<group>"; };
+		A007 /* PoseDetectorManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PoseDetectorManager.swift; sourceTree = "<group>"; };
+		A008 /* CameraManager.swift */       = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CameraManager.swift; sourceTree = "<group>"; };
+		A009 /* ExerciseAnalyzer.swift */    = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExerciseAnalyzer.swift; sourceTree = "<group>"; };
+		A010 /* VoiceCoach.swift */          = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VoiceCoach.swift; sourceTree = "<group>"; };
+		A011 /* PermissionManager.swift */   = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PermissionManager.swift; sourceTree = "<group>"; };
+		A012 /* WorkoutViewModel.swift */    = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkoutViewModel.swift; sourceTree = "<group>"; };
+		APPREF /* KiviFit.app */             = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = KiviFit.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		PLISTREF /* Info.plist */            = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = "Info.plist"; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -51,18 +51,69 @@
 		MAINGROUP = {
 			isa = PBXGroup;
 			children = (
-				SRCGROUP,
-				PLISTREF,
+				KIVIFITGROUP,
+				PRODGROUP,
 			);
+			sourceTree = "<group>";
+		};
+		KIVIFITGROUP = {
+			isa = PBXGroup;
+			children = (
+				SRCGROUP,
+				SUPGROUP,
+			);
+			path = KiviFit;
 			sourceTree = "<group>";
 		};
 		SRCGROUP = {
 			isa = PBXGroup;
 			children = (
-				A001, A002, A003, A004, A005, A006,
-				A007, A008, A009, A010, A011, A012,
+				APPGROUP,
+				MGRGROUP,
+				VIEWGROUP,
 			);
 			path = Sources;
+			sourceTree = "<group>";
+		};
+		APPGROUP = {
+			isa = PBXGroup;
+			children = (
+				A001,
+				A002,
+				A012,
+			);
+			path = App;
+			sourceTree = "<group>";
+		};
+		MGRGROUP = {
+			isa = PBXGroup;
+			children = (
+				A007,
+				A008,
+				A009,
+				A010,
+				A011,
+			);
+			path = Managers;
+			sourceTree = "<group>";
+		};
+		VIEWGROUP = {
+			isa = PBXGroup;
+			children = (
+				A003,
+				A004,
+				A005,
+				A006,
+			);
+			path = Views;
+			sourceTree = "<group>";
+		};
+		SUPGROUP = {
+			isa = PBXGroup;
+			children = (
+				PLISTREF,
+			);
+			path = "Supporting Files";
 			sourceTree = "<group>";
 		};
 		PRODGROUP = {
