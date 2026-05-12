@@ -30,6 +30,10 @@ final class ExerciseAnalyzer {
     private var squatPrevAngle: Float  = 180   // knee angle previous frame
     private var squatMinAngle: Float   = 180   // lowest angle reached in current rep
     private var squatDepthChecked: Bool = false // depth already evaluated this rep
+    // Errors are suppressed until the first complete rep (down + back to standing)
+    // to prevent false positives at startup or when the camera catches a partial body.
+    private var squatRepConfirmed: Bool = false
+    private var squatHasDescended: Bool = false // went below 145° at least once this rep
 
     // MARK: - Landmark indices (MediaPipe 33-point schema)
     private enum LM: Int {
@@ -93,6 +97,10 @@ final class ExerciseAnalyzer {
     // MARK: - Squat
 
     private func analyzeSquat(_ lms: [PoseLandmark]) -> [FormError] {
+        // Require key lower-body landmarks to be visible before any analysis.
+        let keyIndices: [LM] = [.leftHip, .rightHip, .leftKnee, .rightKnee, .leftAnkle, .rightAnkle]
+        guard keyIndices.allSatisfy({ lms[$0.rawValue].visibility > 0.5 }) else { return [] }
+
         var errors: [FormError] = []
 
         let lKnee = angle(a: lm(lms, .leftHip),  b: lm(lms, .leftKnee),  c: lm(lms, .leftAnkle))
@@ -105,10 +113,14 @@ final class ExerciseAnalyzer {
         let delta     = avg - squatPrevAngle   // positive = angle opening = going up
 
         if avg >= 155 {
-            // Back to standing: reset rep state
+            // Back to standing: confirm rep if the person actually descended
             if squatPhase != .standing {
-                squatMinAngle    = 180
+                if squatHasDescended {
+                    squatRepConfirmed = true
+                }
+                squatMinAngle     = 180
                 squatDepthChecked = false
+                squatHasDescended = false
             }
             squatPhase = .standing
         } else if delta < -2 {
@@ -120,10 +132,16 @@ final class ExerciseAnalyzer {
         if squatPhase != .standing {
             squatMinAngle = min(squatMinAngle, avg)
         }
+        // Mark that the user has actually gone into a squat this rep
+        if avg < 145 { squatHasDescended = true }
+
         squatPrevAngle = avg
 
         let justReachedBottom = prevPhase == .descending && squatPhase == .ascending
         let isSquatting       = squatPhase != .standing
+
+        // Suppress all errors until the first complete rep is confirmed.
+        guard squatRepConfirmed else { return [] }
 
         // ── 1. Depth ────────────────────────────────────────────────────────
         // Checked exactly once per rep, at the moment the person starts
@@ -141,7 +159,7 @@ final class ExerciseAnalyzer {
         // ── 2. Knee valgus (cave inward) ───────────────────────────────────
         // Relevant on the way DOWN (most dangerous phase) and on the way UP
         // (common to cave when fatigued). Not checked while standing.
-        if isSquatting {
+        if isSquatting && avg < 145 {
             let hipW   = max(0.05, abs(lm(lms, .rightHip).x - lm(lms, .leftHip).x))
             let thresh = hipW * 0.12
             let lCave  = lm(lms, .leftKnee).x  - lm(lms, .leftAnkle).x  >  thresh
@@ -165,14 +183,16 @@ final class ExerciseAnalyzer {
         }
 
         // ── 4. Heel lift ───────────────────────────────────────────────────
-        // Checked in ALL phases including standing — heel can lift even
-        // before the squat begins if mobility is limited.
-        let lHeelUp = lm(lms, .leftHeel).y  - lm(lms, .leftFootIndex).y  > 0.04
-        let rHeelUp = lm(lms, .rightHeel).y - lm(lms, .rightFootIndex).y > 0.04
-        if lHeelUp || rHeelUp {
-            errors.append(FormError(
-                message: "Пятки отрываются от пола",
-                severity: .critical))
+        // Only checked once the person is actually squatting (angle < 145°).
+        // Avoids false positives from natural sway while standing upright.
+        if isSquatting && avg < 145 {
+            let lHeelUp = lm(lms, .leftHeel).y  - lm(lms, .leftFootIndex).y  > 0.04
+            let rHeelUp = lm(lms, .rightHeel).y - lm(lms, .rightFootIndex).y > 0.04
+            if lHeelUp || rHeelUp {
+                errors.append(FormError(
+                    message: "Пятки отрываются от пола",
+                    severity: .critical))
+            }
         }
 
         return errors
