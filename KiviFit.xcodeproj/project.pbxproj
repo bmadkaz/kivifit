@@ -1,0 +1,220 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 56;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		B001 /* KiviFitApp.swift */ = {isa = PBXBuildFile; fileRef = A001 /* KiviFitApp.swift */; };
+		B002 /* ContentView.swift */ = {isa = PBXBuildFile; fileRef = A002 /* ContentView.swift */; };
+		B003 /* HomeView.swift */ = {isa = PBXBuildFile; fileRef = A003 /* HomeView.swift */; };
+		B004 /* WorkoutView.swift */ = {isa = PBXBuildFile; fileRef = A004 /* WorkoutView.swift */; };
+		B005 /* SkeletonOverlayView.swift */ = {isa = PBXBuildFile; fileRef = A005 /* SkeletonOverlayView.swift */; };
+		B006 /* CameraPreviewView.swift */ = {isa = PBXBuildFile; fileRef = A006 /* CameraPreviewView.swift */; };
+		B007 /* PoseDetectorManager.swift */ = {isa = PBXBuildFile; fileRef = A007 /* PoseDetectorManager.swift */; };
+		B008 /* CameraManager.swift */ = {isa = PBXBuildFile; fileRef = A008 /* CameraManager.swift */; };
+		B009 /* ExerciseAnalyzer.swift */ = {isa = PBXBuildFile; fileRef = A009 /* ExerciseAnalyzer.swift */; };
+		B010 /* VoiceCoach.swift */ = {isa = PBXBuildFile; fileRef = A010 /* VoiceCoach.swift */; };
+		B011 /* PermissionManager.swift */ = {isa = PBXBuildFile; fileRef = A011 /* PermissionManager.swift */; };
+		B012 /* WorkoutViewModel.swift */ = {isa = PBXBuildFile; fileRef = A012 /* WorkoutViewModel.swift */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXFileReference section */
+		A001 /* KiviFitApp.swift */            = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KiviFitApp.swift; sourceTree = "<group>"; };
+		A002 /* ContentView.swift */           = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
+		A003 /* HomeView.swift */              = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HomeView.swift; sourceTree = "<group>"; };
+		A004 /* WorkoutView.swift */           = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkoutView.swift; sourceTree = "<group>"; };
+		A005 /* SkeletonOverlayView.swift */   = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SkeletonOverlayView.swift; sourceTree = "<group>"; };
+		A006 /* CameraPreviewView.swift */     = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CameraPreviewView.swift; sourceTree = "<group>"; };
+		A007 /* PoseDetectorManager.swift */   = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PoseDetectorManager.swift; sourceTree = "<group>"; };
+		A008 /* CameraManager.swift */         = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CameraManager.swift; sourceTree = "<group>"; };
+		A009 /* ExerciseAnalyzer.swift */      = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExerciseAnalyzer.swift; sourceTree = "<group>"; };
+		A010 /* VoiceCoach.swift */            = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VoiceCoach.swift; sourceTree = "<group>"; };
+		A011 /* PermissionManager.swift */     = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PermissionManager.swift; sourceTree = "<group>"; };
+		A012 /* WorkoutViewModel.swift */      = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkoutViewModel.swift; sourceTree = "<group>"; };
+		APPREF /* KiviFit.app */               = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = KiviFit.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		PLISTREF /* Info.plist */              = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = "Info.plist"; sourceTree = "<group>"; };
+/* End PBXFileReference section */
+
+/* Begin PBXFrameworksBuildPhase section */
+		FRAMEPHASE = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = ();
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXFrameworksBuildPhase section */
+
+/* Begin PBXGroup section */
+		MAINGROUP = {
+			isa = PBXGroup;
+			children = (
+				SRCGROUP,
+				PLISTREF,
+			);
+			sourceTree = "<group>";
+		};
+		SRCGROUP = {
+			isa = PBXGroup;
+			children = (
+				A001, A002, A003, A004, A005, A006,
+				A007, A008, A009, A010, A011, A012,
+			);
+			path = Sources;
+			sourceTree = "<group>";
+		};
+		PRODGROUP = {
+			isa = PBXGroup;
+			children = (APPREF);
+			name = Products;
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		TARGET1 = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = BUILDCFGLIST;
+			buildPhases = (SRCPHASE, FRAMEPHASE);
+			buildRules = ();
+			dependencies = ();
+			name = KiviFit;
+			productName = KiviFit;
+			productReference = APPREF;
+			productType = "com.apple.product-type.application";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		PROJECT = {
+			isa = PBXProject;
+			attributes = {
+				BuildIndependentTargetsInParallel = 1;
+				LastSwiftUpdateCheck = 1500;
+				LastUpgradeCheck = 1500;
+			};
+			buildConfigurationList = PROJCFGLIST;
+			compatibilityVersion = "Xcode 14.0";
+			developmentRegion = ru;
+			hasScannedForEncodings = 0;
+			knownRegions = (en, ru, Base);
+			mainGroup = MAINGROUP;
+			productRefGroup = PRODGROUP;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (TARGET1);
+		};
+/* End PBXProject section */
+
+/* Begin PBXSourcesBuildPhase section */
+		SRCPHASE = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				B001, B002, B003, B004, B005, B006,
+				B007, B008, B009, B010, B011, B012,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin XCBuildConfiguration section */
+		CFG_DEBUG = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CODE_SIGN_IDENTITY = "";
+				CODE_SIGNING_ALLOWED = NO;
+				CODE_SIGNING_REQUIRED = NO;
+				CURRENT_PROJECT_VERSION = 1;
+				DEBUG_INFORMATION_FORMAT = dwarf;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_TESTABILITY = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				GCC_DYNAMIC_NO_PIC = NO;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_PREPROCESSOR_DEFINITIONS = ("DEBUG=1", "$(inherited)");
+				INFOPLIST_FILE = "KiviFit/Supporting Files/Info.plist";
+				IPHONEOS_DEPLOYMENT_TARGET = 16.0;
+				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
+				MTL_FAST_MATH = YES;
+				ONLY_ACTIVE_ARCH = YES;
+				PRODUCT_BUNDLE_IDENTIFIER = com.kivifit.app;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SUPPORTED_PLATFORMS = iphoneos;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG;
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+				SWIFT_VERSION = 5.9;
+				TARGETED_DEVICE_FAMILY = 1;
+			};
+			name = Debug;
+		};
+		CFG_RELEASE = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CODE_SIGN_IDENTITY = "";
+				CODE_SIGNING_ALLOWED = NO;
+				CODE_SIGNING_REQUIRED = NO;
+				CURRENT_PROJECT_VERSION = 1;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				ENABLE_NS_ASSERTIONS = NO;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				INFOPLIST_FILE = "KiviFit/Supporting Files/Info.plist";
+				IPHONEOS_DEPLOYMENT_TARGET = 16.0;
+				MTL_ENABLE_DEBUG_INFO = NO;
+				MTL_FAST_MATH = YES;
+				PRODUCT_BUNDLE_IDENTIFIER = com.kivifit.app;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SUPPORTED_PLATFORMS = iphoneos;
+				SWIFT_OPTIMIZATION_LEVEL = "-Owholemodule";
+				SWIFT_VERSION = 5.9;
+				TARGETED_DEVICE_FAMILY = 1;
+				VALIDATE_PRODUCT = YES;
+			};
+			name = Release;
+		};
+		PROJ_DBG = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++20";
+				SWIFT_VERSION = 5.9;
+			};
+			name = Debug;
+		};
+		PROJ_REL = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++20";
+				SWIFT_VERSION = 5.9;
+			};
+			name = Release;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		PROJCFGLIST = {
+			isa = XCConfigurationList;
+			buildConfigurations = (PROJ_DBG, PROJ_REL);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		BUILDCFGLIST = {
+			isa = XCConfigurationList;
+			buildConfigurations = (CFG_DEBUG, CFG_RELEASE);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+/* End XCConfigurationList section */
+	};
+	rootObject = PROJECT;
+}

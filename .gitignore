@@ -1,0 +1,32 @@
+# Xcode
+*.xcuserstate
+xcuserdata/
+DerivedData/
+*.hmap
+*.ipa
+*.xcarchive
+*.dSYM.zip
+*.dSYM
+
+# CocoaPods
+Pods/
+*.xcworkspace
+!default.xcworkspace
+
+# SwiftPM
+.build/
+.swiftpm/
+
+# macOS
+.DS_Store
+*.swp
+
+# MediaPipe models (large binary files - downloaded at build time)
+KiviFit/Resources/*.task
+
+# Build
+build/
+Payload/
+
+# Shell brace expansion artifact (accidental directory)
+{KiviFit/

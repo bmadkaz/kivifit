@@ -1,0 +1,80 @@
+workflows:
+  kivifit-unsigned-ipa:
+    name: KiviFit — Unsigned IPA (Sideloadly)
+    max_build_duration: 60
+    instance_type: mac_mini_m1
+
+    environment:
+      xcode: 15.4
+      cocoapods: default
+      vars:
+        BUNDLE_ID: "com.kivifit.app"
+        APP_NAME: "KiviFit"
+        XCODE_PROJECT: "KiviFit.xcodeproj"
+        XCODE_SCHEME: "KiviFit"
+
+    scripts:
+      - name: Install CocoaPods dependencies
+        script: |
+          pod install --repo-update
+
+      - name: Download MediaPipe model (heavy)
+        script: |
+          mkdir -p KiviFit/Resources
+          # Download pose_landmarker_heavy.task from MediaPipe releases
+          curl -L "https://storage.googleapis.com/mediapipe-models/pose_landmarker/pose_landmarker_heavy/float16/latest/pose_landmarker_heavy.task" \
+            -o KiviFit/Resources/pose_landmarker_heavy.task
+          # Download lite as fallback
+          curl -L "https://storage.googleapis.com/mediapipe-models/pose_landmarker/pose_landmarker_lite/float16/latest/pose_landmarker_lite.task" \
+            -o KiviFit/Resources/pose_landmarker_lite.task
+          echo "Models downloaded:"
+          ls -lh KiviFit/Resources/
+
+      - name: Build unsigned IPA (no code signing)
+        script: |
+          # Build for device without signing
+          xcodebuild \
+            -workspace KiviFit.xcworkspace \
+            -scheme "$XCODE_SCHEME" \
+            -configuration Release \
+            -sdk iphoneos \
+            -destination "generic/platform=iOS" \
+            CODE_SIGN_IDENTITY="" \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGNING_ALLOWED=NO \
+            ONLY_ACTIVE_ARCH=NO \
+            clean build \
+            -derivedDataPath DerivedData \
+            | xcpretty --color
+
+      - name: Package unsigned IPA
+        script: |
+          set -e
+          # Find the .app bundle
+          APP_PATH=$(find DerivedData -name "*.app" -not -path "*/PlugIns/*" | head -1)
+          echo "Found app: $APP_PATH"
+
+          # Create Payload folder structure (standard IPA layout)
+          mkdir -p Payload
+          cp -r "$APP_PATH" Payload/
+
+          # Zip into .ipa
+          zip -r "${APP_NAME}-unsigned.ipa" Payload/
+          echo "IPA created: ${APP_NAME}-unsigned.ipa"
+          ls -lh "${APP_NAME}-unsigned.ipa"
+
+      - name: Verify IPA
+        script: |
+          unzip -l "${APP_NAME}-unsigned.ipa" | head -30
+
+    artifacts:
+      - "*.ipa"
+      - DerivedData/Logs/**/*.log
+
+    publishing:
+      email:
+        recipients:
+          - your@email.com
+        notify:
+          success: true
+          failure: true

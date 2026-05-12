@@ -1,0 +1,58 @@
+name: Build Unsigned IPA
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: macos-14  # M1 runner with Xcode 15
+    
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Select Xcode 15
+        run: sudo xcode-select -s /Applications/Xcode_15.4.app
+
+      - name: Install CocoaPods
+        run: |
+          gem install cocoapods --no-document
+          pod install --repo-update
+
+      - name: Download MediaPipe models
+        run: |
+          mkdir -p KiviFit/Resources
+          curl -L "https://storage.googleapis.com/mediapipe-models/pose_landmarker/pose_landmarker_heavy/float16/latest/pose_landmarker_heavy.task" \
+            -o KiviFit/Resources/pose_landmarker_heavy.task
+          curl -L "https://storage.googleapis.com/mediapipe-models/pose_landmarker/pose_landmarker_lite/float16/latest/pose_landmarker_lite.task" \
+            -o KiviFit/Resources/pose_landmarker_lite.task
+
+      - name: Build unsigned
+        run: |
+          xcodebuild \
+            -workspace KiviFit.xcworkspace \
+            -scheme KiviFit \
+            -configuration Release \
+            -sdk iphoneos \
+            -destination "generic/platform=iOS" \
+            CODE_SIGN_IDENTITY="" \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGNING_ALLOWED=NO \
+            clean build \
+            -derivedDataPath DerivedData
+
+      - name: Package IPA
+        run: |
+          APP=$(find DerivedData -name "*.app" -not -path "*/PlugIns/*" | head -1)
+          mkdir -p Payload
+          cp -r "$APP" Payload/
+          zip -r KiviFit-unsigned.ipa Payload/
+
+      - name: Upload IPA artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: KiviFit-unsigned-ipa
+          path: KiviFit-unsigned.ipa
+          retention-days: 14
