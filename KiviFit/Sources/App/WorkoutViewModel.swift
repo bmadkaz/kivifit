@@ -10,12 +10,12 @@ final class WorkoutViewModel: NSObject, ObservableObject {
     @Published var fps: Int = 0
     @Published var processingStatus: String = "Инициализация..."
     @Published var selectedExercise: Exercise = .squat
-    @Published var imageSize: CGSize = CGSize(width: 1280, height: 720)
+    @Published var imageSize: CGSize = CGSize(width: 480, height: 360)
 
     // MARK: - Services
     let captureSession: AVCaptureSession
     private let cameraManager = CameraManager()
-    private let poseDetector = PoseDetectorManager(config: .init(frameSkip: 2, smoothingWindowSize: 4))
+    private let poseDetector = PoseDetectorManager(config: .init(emaAlpha: 0.5))
     private let analyzer = ExerciseAnalyzer()
     private let voiceCoach = VoiceCoach()
 

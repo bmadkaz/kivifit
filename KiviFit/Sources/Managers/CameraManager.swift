@@ -32,7 +32,9 @@ final class CameraManager: NSObject {
 
     private func configureSession() {
         captureSession.beginConfiguration()
-        captureSession.sessionPreset = .hd1280x720
+        // 480p: MediaPipe resizes internally to 256×256 anyway,
+        // smaller input = faster MPImage creation = lower latency
+        captureSession.sessionPreset = .medium
 
         // Front camera
         guard let device = AVCaptureDevice.default(
@@ -77,7 +79,7 @@ final class CameraManager: NSObject {
         }
 
         self.videoDataOutput = output
-        imageSize = CGSize(width: 1280, height: 720)
+        imageSize = CGSize(width: 480, height: 360)
 
         captureSession.commitConfiguration()
         captureSession.startRunning()

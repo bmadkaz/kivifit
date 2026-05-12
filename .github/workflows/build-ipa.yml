@@ -24,9 +24,11 @@ jobs:
       - name: Download MediaPipe models
         run: |
           mkdir -p KiviFit/Resources
-          curl -L "https://storage.googleapis.com/mediapipe-models/pose_landmarker/pose_landmarker_heavy/float16/latest/pose_landmarker_heavy.task" \
+          curl -fL "https://storage.googleapis.com/mediapipe-models/pose_landmarker/pose_landmarker_full/float16/latest/pose_landmarker_full.task" \
+            -o KiviFit/Resources/pose_landmarker_full.task
+          curl -fL "https://storage.googleapis.com/mediapipe-models/pose_landmarker/pose_landmarker_heavy/float16/latest/pose_landmarker_heavy.task" \
             -o KiviFit/Resources/pose_landmarker_heavy.task
-          curl -L "https://storage.googleapis.com/mediapipe-models/pose_landmarker/pose_landmarker_lite/float16/latest/pose_landmarker_lite.task" \
+          curl -fL "https://storage.googleapis.com/mediapipe-models/pose_landmarker/pose_landmarker_lite/float16/latest/pose_landmarker_lite.task" \
             -o KiviFit/Resources/pose_landmarker_lite.task
 
       - name: Build unsigned

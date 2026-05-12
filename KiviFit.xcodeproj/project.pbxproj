@@ -21,6 +21,7 @@
 		B012 /* WorkoutViewModel.swift */ = {isa = PBXBuildFile; fileRef = A012 /* WorkoutViewModel.swift */; };
 		C001 /* pose_landmarker_heavy.task */ = {isa = PBXBuildFile; fileRef = R001 /* pose_landmarker_heavy.task */; };
 		C002 /* pose_landmarker_lite.task */ = {isa = PBXBuildFile; fileRef = R002 /* pose_landmarker_lite.task */; };
+		C003 /* pose_landmarker_full.task */  = {isa = PBXBuildFile; fileRef = R003 /* pose_landmarker_full.task */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -40,6 +41,7 @@
 		PLISTREF /* Info.plist */            = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = "Info.plist"; sourceTree = "<group>"; };
 		R001 /* pose_landmarker_heavy.task */ = {isa = PBXFileReference; lastKnownFileType = file; path = pose_landmarker_heavy.task; sourceTree = "<group>"; };
 		R002 /* pose_landmarker_lite.task */  = {isa = PBXFileReference; lastKnownFileType = file; path = pose_landmarker_lite.task; sourceTree = "<group>"; };
+		R003 /* pose_landmarker_full.task */  = {isa = PBXFileReference; lastKnownFileType = file; path = pose_landmarker_full.task; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -58,6 +60,7 @@
 			files = (
 				C001,
 				C002,
+				C003,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -130,6 +133,7 @@
 			children = (
 				R001,
 				R002,
+				R003,
 			);
 			path = Resources;
 			sourceTree = "<group>";

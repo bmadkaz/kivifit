@@ -2,7 +2,6 @@ import Foundation
 import CoreMedia
 import MediaPipeTasksVision
 
-/// Delegate protocol for receiving pose detection results
 protocol PoseDetectorDelegate: AnyObject {
     func poseDetector(_ detector: PoseDetectorManager,
                       didDetect landmarks: [PoseLandmark],
@@ -10,30 +9,27 @@ protocol PoseDetectorDelegate: AnyObject {
     func poseDetector(_ detector: PoseDetectorManager, didFailWithError error: Error)
 }
 
-/// Manages MediaPipe pose landmark detection with GPU acceleration, frame skipping,
-/// and smoothing. Uses PoseLandmarker Heavy model for maximum accuracy.
 final class PoseDetectorManager: NSObject {
 
     // MARK: - Configuration
     struct Config {
-        /// Process every N-th frame to prevent overheating
-        var frameSkip: Int = 2
-        /// Minimum landmark detection confidence
+        /// EMA smoothing factor: 0 = max smooth (laggy), 1 = no smooth (raw)
+        /// 0.5 gives good balance for exercise tracking
+        var emaAlpha: Float = 0.5
         var minPoseDetectionConfidence: Float = 0.5
         var minPosePresenceConfidence: Float = 0.5
         var minTrackingConfidence: Float = 0.5
-        /// Smoothing window size
-        var smoothingWindowSize: Int = 5
     }
 
     // MARK: - Properties
     weak var delegate: PoseDetectorDelegate?
     private let config: Config
     private var poseLandmarker: PoseLandmarker?
-    private var frameCounter: Int = 0
     private let processingQueue = DispatchQueue(label: "com.kivifit.pose", qos: .userInteractive)
-    private var smoothingBuffers: [[PoseLandmark]] = []
-    private var timestampMs: Int = 0
+    /// Semaphore(1): tryWait drops new frame if detector is still busy
+    private let frameGate = DispatchSemaphore(value: 1)
+    /// EMA state — smooths without adding lag
+    private var emaLandmarks: [PoseLandmark] = []
 
     // MARK: - Init
     init(config: Config = Config()) {
@@ -44,12 +40,13 @@ final class PoseDetectorManager: NSObject {
 
     // MARK: - Setup
     private func setupDetector() {
-        guard let modelPath = Bundle.main.path(
-            forResource: "pose_landmarker_heavy",
-            ofType: "task"
-        ) else {
-            print("[KiviFit] ⚠️ Model file not found. Using lite model as fallback.")
-            setupFallbackDetector()
+        let modelName = Bundle.main.path(forResource: "pose_landmarker_full", ofType: "task") != nil
+            ? "pose_landmarker_full"
+            : "pose_landmarker_heavy"
+
+        guard let modelPath = Bundle.main.path(forResource: modelName, ofType: "task")
+                           ?? Bundle.main.path(forResource: "pose_landmarker_lite", ofType: "task") else {
+            print("[KiviFit] ❌ No model files found in bundle")
             return
         }
 
@@ -62,48 +59,24 @@ final class PoseDetectorManager: NSObject {
             options.runningMode = .video
             options.numPoses = 1
             options.minPoseDetectionConfidence = config.minPoseDetectionConfidence
-            options.minPosePresenceConfidence = config.minPosePresenceConfidence
-            options.minTrackingConfidence = config.minTrackingConfidence
+            options.minPosePresenceConfidence  = config.minPosePresenceConfidence
+            options.minTrackingConfidence      = config.minTrackingConfidence
 
             poseLandmarker = try PoseLandmarker(options: options)
-            print("[KiviFit] ✅ PoseLandmarker (heavy) initialized on GPU")
+            print("[KiviFit] ✅ PoseLandmarker (\(modelName)) ready")
         } catch {
-            print("[KiviFit] ❌ Failed to init PoseLandmarker: \(error)")
-            setupFallbackDetector()
-        }
-    }
-
-    private func setupFallbackDetector() {
-        // Fallback to lite model if heavy not available
-        guard let modelPath = Bundle.main.path(
-            forResource: "pose_landmarker_lite",
-            ofType: "task"
-        ) else {
-            print("[KiviFit] ❌ No model files found in bundle")
-            return
-        }
-        do {
-            let baseOptions = BaseOptions()
-            baseOptions.modelAssetPath = modelPath
-            let options = PoseLandmarkerOptions()
-            options.baseOptions = baseOptions
-            options.runningMode = .video
-            options.numPoses = 1
-            poseLandmarker = try PoseLandmarker(options: options)
-            print("[KiviFit] ⚠️ Using lite fallback model")
-        } catch {
-            print("[KiviFit] ❌ Fallback also failed: \(error)")
+            print("[KiviFit] ❌ PoseLandmarker init failed: \(error)")
         }
     }
 
     // MARK: - Public API
-    /// Call this for each CMSampleBuffer from AVCaptureOutput
     func process(sampleBuffer: CMSampleBuffer) {
-        frameCounter += 1
-        guard frameCounter % config.frameSkip == 0 else { return }
+        // Drop frame immediately if previous detection is still running
+        guard frameGate.wait(timeout: .now()) == .success else { return }
 
         processingQueue.async { [weak self] in
             self?.detect(sampleBuffer: sampleBuffer)
+            self?.frameGate.signal()
         }
     }
 
@@ -111,79 +84,71 @@ final class PoseDetectorManager: NSObject {
     private func detect(sampleBuffer: CMSampleBuffer) {
         guard let landmarker = poseLandmarker else { return }
 
-        timestampMs += 33 // approximate 30fps timestamp increment
+        // Use real presentation timestamp — critical for MediaPipe Kalman filter
+        let pts = CMSampleBufferGetPresentationTimeStamp(sampleBuffer)
+        let timestampMs = Int(CMTimeGetSeconds(pts) * 1000)
+        guard timestampMs > 0 else { return }
 
         do {
             let mpImage = try MPImage(sampleBuffer: sampleBuffer)
             let result = try landmarker.detect(videoFrame: mpImage,
                                                timestampInMilliseconds: timestampMs)
 
-            guard let poseLandmarks = result.landmarks.first,
+            guard let poseLandmarks  = result.landmarks.first,
                   let worldLandmarks = result.worldLandmarks.first else {
-                // No pose detected
-                DispatchQueue.main.async {
+                DispatchQueue.main.async { [weak self] in
+                    guard let self else { return }
+                    self.emaLandmarks = []
                     self.delegate?.poseDetector(self, didDetect: [], worldLandmarks: [])
                 }
                 return
             }
 
-            // Convert MediaPipe landmarks to our model
-            let normalized = poseLandmarks.map { lm in
-                PoseLandmark(
-                    x: lm.x, y: lm.y, z: lm.z,
-                    visibility: lm.visibility?.floatValue ?? 0,
-                    presence: lm.presence?.floatValue ?? 0
-                )
+            let normalized = poseLandmarks.map {
+                PoseLandmark(x: $0.x, y: $0.y, z: $0.z,
+                             visibility: $0.visibility?.floatValue ?? 0,
+                             presence:   $0.presence?.floatValue   ?? 0)
             }
-            let world = worldLandmarks.map { lm in
-                PoseLandmark(
-                    x: lm.x, y: lm.y, z: lm.z,
-                    visibility: lm.visibility?.floatValue ?? 0,
-                    presence: lm.presence?.floatValue ?? 0
-                )
+            let world = worldLandmarks.map {
+                PoseLandmark(x: $0.x, y: $0.y, z: $0.z,
+                             visibility: $0.visibility?.floatValue ?? 0,
+                             presence:   $0.presence?.floatValue   ?? 0)
             }
 
-            // Apply smoothing
-            let smoothed = applySmoothingFilter(to: normalized)
+            let smoothed = applyEMA(to: normalized)
 
-            DispatchQueue.main.async {
+            DispatchQueue.main.async { [weak self] in
+                guard let self else { return }
                 self.delegate?.poseDetector(self, didDetect: smoothed, worldLandmarks: world)
             }
 
         } catch {
-            DispatchQueue.main.async {
+            DispatchQueue.main.async { [weak self] in
+                guard let self else { return }
                 self.delegate?.poseDetector(self, didFailWithError: error)
             }
         }
     }
 
-    // MARK: - Smoothing (sliding window average)
-    private func applySmoothingFilter(to landmarks: [PoseLandmark]) -> [PoseLandmark] {
-        smoothingBuffers.append(landmarks)
-        if smoothingBuffers.count > config.smoothingWindowSize {
-            smoothingBuffers.removeFirst()
+    // MARK: - EMA Smoothing
+    // Exponential moving average: zero added latency, removes jitter.
+    // alpha=0.5: equal weight to new and history → smooth but responsive.
+    private func applyEMA(to landmarks: [PoseLandmark]) -> [PoseLandmark] {
+        guard !emaLandmarks.isEmpty, emaLandmarks.count == landmarks.count else {
+            emaLandmarks = landmarks
+            return landmarks
         }
-        guard smoothingBuffers.count > 1 else { return landmarks }
-
-        let count = landmarks.count
-        var result = landmarks
-        for i in 0..<count {
-            var sumX: Float = 0, sumY: Float = 0, sumZ: Float = 0
-            var sumVis: Float = 0
-            for frame in smoothingBuffers {
-                guard i < frame.count else { continue }
-                sumX += frame[i].x
-                sumY += frame[i].y
-                sumZ += frame[i].z
-                sumVis += frame[i].visibility
-            }
-            let n = Float(smoothingBuffers.count)
-            result[i] = PoseLandmark(
-                x: sumX / n, y: sumY / n, z: sumZ / n,
-                visibility: sumVis / n,
-                presence: landmarks[i].presence
+        let a = config.emaAlpha
+        let b = 1 - a
+        emaLandmarks = zip(emaLandmarks, landmarks).map { prev, curr in
+            PoseLandmark(
+                x:          a * curr.x          + b * prev.x,
+                y:          a * curr.y          + b * prev.y,
+                z:          a * curr.z          + b * prev.z,
+                visibility: a * curr.visibility + b * prev.visibility,
+                presence:   curr.presence
             )
         }
-        return result
+        return emaLandmarks
     }
 }
