@@ -101,7 +101,6 @@ final class ExerciseAnalyzer {
     // MARK: - Squat
 
     private func analyzeSquat(_ lms: [PoseLandmark]) -> [FormError] {
-        // Require key lower-body landmarks to be visible before any analysis.
         let keyIndices: [LM] = [.leftHip, .rightHip, .leftKnee, .rightKnee, .leftAnkle, .rightAnkle]
         guard keyIndices.allSatisfy({ lms[$0.rawValue].visibility > 0.5 }) else { return [] }
 
@@ -121,13 +120,15 @@ final class ExerciseAnalyzer {
                     squatRepConfirmed = true
                     repJustCompleted  = true
                 }
+                // squatMinAngle is read for depth BEFORE this block (at justReachedBottom),
+                // so reset here is safe.
                 squatMinAngle     = 180
                 squatHasDescended = false
             }
             squatPhase = .standing
         } else if delta < -2 {
-            // Starting descent — reset per-rep error accumulators
             if prevPhase == .standing {
+                // New rep starting — reset per-rep accumulators
                 repHadValgus      = false
                 repHadHeelLift    = false
                 repHadForwardLean = false
@@ -139,63 +140,57 @@ final class ExerciseAnalyzer {
             squatPhase = .ascending
         }
 
-        if squatPhase != .standing {
-            squatMinAngle = min(squatMinAngle, avg)
-        }
+        if squatPhase != .standing { squatMinAngle = min(squatMinAngle, avg) }
         if avg < 145 { squatHasDescended = true }
         squatPrevAngle = avg
 
-        // ── Accumulate per-rep error flags (only in bottom range) ─────────────
-        let isSquatting = squatPhase != .standing
-        if isSquatting && avg < 130 {
+        let justReachedBottom = prevPhase == .descending && squatPhase == .ascending
+
+        guard squatRepConfirmed else { return [] }
+
+        var errors: [FormError] = []
+
+        // ── Depth: fire immediately when ascending starts ─────────────────────
+        if justReachedBottom && squatMinAngle > 90 {
+            errors.append(FormError(
+                message: "Недостаточная глубина — опустите бёдра до параллели с полом",
+                severity: .warning))
+        }
+
+        // ── Accumulate form flags in the bottom zone (avg < 130°) ─────────────
+        if squatPhase != .standing && avg < 130 {
             repBottomFrames += 1
 
-            // Valgus: knee closer to hip-centre than ankle is.
-            // Uses |x| so result is sign-convention independent.
             let hipW   = max(0.05, abs(lm(lms, .rightHip).x - lm(lms, .leftHip).x))
             let thresh = hipW * 0.18
             let lCave  = abs(lm(lms, .leftKnee).x)  < abs(lm(lms, .leftAnkle).x)  - thresh
             let rCave  = abs(lm(lms, .rightKnee).x) < abs(lm(lms, .rightAnkle).x) - thresh
             if lCave || rCave { repValgusFrames += 1 }
 
-            // Heel lift
             let lHeelUp = lm(lms, .leftHeel).y  - lm(lms, .leftFootIndex).y  > 0.04
             let rHeelUp = lm(lms, .rightHeel).y - lm(lms, .rightFootIndex).y > 0.04
             if lHeelUp || rHeelUp { repHadHeelLift = true }
 
-            // Forward lean
             if spineLean(lms) > 50 { repHadForwardLean = true }
         }
 
-        // ── Emit errors only when the rep is completed ────────────────────────
-        guard squatRepConfirmed && repJustCompleted else { return [] }
-
-        var errors: [FormError] = []
-
-        // Depth: check the minimum angle reached this rep
-        if squatMinAngle > 90 {
-            errors.append(FormError(
-                message: "Недостаточная глубина — опустите бёдра до параллели с полом",
-                severity: .warning))
-        }
-
-        // Valgus: only report if seen in >40% of bottom frames
-        if repBottomFrames > 0 && repValgusFrames > repBottomFrames * 2 / 5 {
-            errors.append(FormError(
-                message: "Колени завалились внутрь — разведите их по носкам",
-                severity: .critical))
-        }
-
-        if repHadForwardLean {
-            errors.append(FormError(
-                message: "Чрезмерный наклон корпуса вперёд",
-                severity: .warning))
-        }
-
-        if repHadHeelLift {
-            errors.append(FormError(
-                message: "Пятки отрывались от пола",
-                severity: .critical))
+        // ── Form errors: fire at rep completion ───────────────────────────────
+        if repJustCompleted {
+            if repBottomFrames > 0 && repValgusFrames > repBottomFrames * 2 / 5 {
+                errors.append(FormError(
+                    message: "Колени завалились внутрь — разведите их по носкам",
+                    severity: .critical))
+            }
+            if repHadForwardLean {
+                errors.append(FormError(
+                    message: "Чрезмерный наклон корпуса вперёд",
+                    severity: .warning))
+            }
+            if repHadHeelLift {
+                errors.append(FormError(
+                    message: "Пятки отрывались от пола",
+                    severity: .critical))
+            }
         }
 
         return errors
