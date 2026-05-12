@@ -28,7 +28,8 @@ final class ExerciseAnalyzer {
     private enum SquatPhase { case standing, descending, ascending }
     private var squatPhase: SquatPhase = .standing
     private var squatPrevAngle: Float  = 180   // knee angle previous frame
-    private var squatMinAngle: Float   = 180   // lowest angle reached in current rep
+    private var squatMinAngle: Float    = 180   // lowest angle reached in current rep
+    private var squatDepthChecked: Bool = false // depth evaluated once per rep
     // Errors are suppressed until the first complete rep (down + back to standing)
     // to prevent false positives at startup or when the camera catches a partial body.
     private var squatRepConfirmed: Bool = false
@@ -118,6 +119,7 @@ final class ExerciseAnalyzer {
                     squatRepConfirmed = true
                 }
                 squatMinAngle     = 180
+                squatDepthChecked = false
                 squatHasDescended = false
             }
             squatPhase = .standing
@@ -135,12 +137,25 @@ final class ExerciseAnalyzer {
 
         squatPrevAngle = avg
 
-        let isSquatting = squatPhase != .standing
+        let justReachedBottom = prevPhase == .descending && squatPhase == .ascending
+        let isSquatting       = squatPhase != .standing
 
         // Suppress all errors until the first complete rep is confirmed.
         guard squatRepConfirmed else { return [] }
 
-        // ── 1. Knee valgus (cave inward) ───────────────────────────────────
+        // ── 1. Depth ────────────────────────────────────────────────────────
+        // Fired once per rep at the descending→ascending transition.
+        // Target: knee angle ≤ 90° (thighs parallel to floor).
+        if justReachedBottom && !squatDepthChecked {
+            squatDepthChecked = true
+            if squatMinAngle > 90 {
+                errors.append(FormError(
+                    message: "Недостаточная глубина — опустите бёдра до параллели с полом",
+                    severity: .warning))
+            }
+        }
+
+        // ── 2. Knee valgus (cave inward) ───────────────────────────────────
         // World coords, mirrored front camera: leftHip.x > 0, rightHip.x < 0.
         // Left valgus  → leftKnee.x  < leftAnkle.x  (knee moves toward centre)
         // Right valgus → rightKnee.x > rightAnkle.x (knee moves toward centre)
