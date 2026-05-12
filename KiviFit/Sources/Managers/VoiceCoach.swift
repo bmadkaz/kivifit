@@ -45,9 +45,8 @@ final class VoiceCoach {
     }
 
     func speak(_ text: String) {
-        if synthesizer.isSpeaking {
-            synthesizer.stopSpeaking(at: .immediate)
-        }
+        // Never interrupt ongoing speech — let it finish first.
+        guard !synthesizer.isSpeaking else { return }
         let utterance = AVSpeechUtterance(string: text)
         utterance.voice = AVSpeechSynthesisVoice(language: "ru-RU")
         utterance.rate = 0.48

@@ -79,14 +79,13 @@ extension WorkoutViewModel: PoseDetectorDelegate {
                 return
             }
 
-            // Analyze form errors
+            // Analyze form errors — analyzer returns non-empty only at rep completion
             let errors = self.analyzer.analyze(exercise: self.selectedExercise,
                                                landmarks: worldLandmarks)
             if let topError = errors.first(where: { $0.severity == .critical }) ?? errors.first {
                 self.currentError = topError.message
                 self.voiceCoach.announce(errors: errors)
-            } else {
-                self.scheduleErrorClear()
+                self.scheduleErrorClear(after: 6.0)
             }
         }
     }
@@ -97,10 +96,11 @@ extension WorkoutViewModel: PoseDetectorDelegate {
         }
     }
 
-    private func scheduleErrorClear() {
+    private func scheduleErrorClear(after seconds: TimeInterval = 1.5) {
         errorClearTask?.cancel()
         errorClearTask = Task {
-            try? await Task.sleep(nanoseconds: 1_500_000_000)
+            let ns = UInt64(seconds * 1_000_000_000)
+            try? await Task.sleep(nanoseconds: ns)
             if !Task.isCancelled {
                 currentError = ""
             }

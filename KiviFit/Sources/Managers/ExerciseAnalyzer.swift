@@ -27,13 +27,17 @@ final class ExerciseAnalyzer {
     // MARK: - Squat phase state
     private enum SquatPhase { case standing, descending, ascending }
     private var squatPhase: SquatPhase = .standing
-    private var squatPrevAngle: Float  = 180   // knee angle previous frame
-    private var squatMinAngle: Float    = 180   // lowest angle reached in current rep
-    private var squatDepthChecked: Bool = false // depth evaluated once per rep
-    // Errors are suppressed until the first complete rep (down + back to standing)
-    // to prevent false positives at startup or when the camera catches a partial body.
-    private var squatRepConfirmed: Bool = false
-    private var squatHasDescended: Bool = false  // went below 145° at least once this rep
+    private var squatPrevAngle: Float   = 180
+    private var squatMinAngle: Float    = 180
+    // Per-rep error flags — set during the rep, reported once at completion
+    private var repHadValgus: Bool      = false
+    private var repHadHeelLift: Bool    = false
+    private var repHadForwardLean: Bool = false
+    private var repValgusFrames: Int    = 0   // frames valgus detected (at bottom)
+    private var repBottomFrames: Int    = 0   // frames spent below 120°
+    // Rep lifecycle
+    private var squatHasDescended: Bool = false
+    private var squatRepConfirmed: Bool = false  // true after first complete rep
 
     // MARK: - Landmark indices (MediaPipe 33-point schema)
     private enum LM: Int {
@@ -101,99 +105,97 @@ final class ExerciseAnalyzer {
         let keyIndices: [LM] = [.leftHip, .rightHip, .leftKnee, .rightKnee, .leftAnkle, .rightAnkle]
         guard keyIndices.allSatisfy({ lms[$0.rawValue].visibility > 0.5 }) else { return [] }
 
-        var errors: [FormError] = []
+        let lKneeAng = angle(a: lm(lms, .leftHip),  b: lm(lms, .leftKnee),  c: lm(lms, .leftAnkle))
+        let rKneeAng = angle(a: lm(lms, .rightHip), b: lm(lms, .rightKnee), c: lm(lms, .rightAnkle))
+        let avg      = (lKneeAng + rKneeAng) / 2
 
-        let lKnee = angle(a: lm(lms, .leftHip),  b: lm(lms, .leftKnee),  c: lm(lms, .leftAnkle))
-        let rKnee = angle(a: lm(lms, .rightHip), b: lm(lms, .rightKnee), c: lm(lms, .rightAnkle))
-        let avg   = (lKnee + rKnee) / 2
-
-        // ── Phase detection ────────────────────────────────────────────────
-        // Uses a 2°-hysteresis delta so noise doesn't flip the phase.
+        // ── Phase detection (2° hysteresis) ──────────────────────────────────
         let prevPhase = squatPhase
-        let delta     = avg - squatPrevAngle   // positive = angle opening = going up
+        let delta     = avg - squatPrevAngle
+
+        var repJustCompleted = false
 
         if avg >= 155 {
-            // Back to standing: confirm rep if the person actually descended
             if squatPhase != .standing {
                 if squatHasDescended {
                     squatRepConfirmed = true
+                    repJustCompleted  = true
                 }
                 squatMinAngle     = 180
-                squatDepthChecked = false
                 squatHasDescended = false
             }
             squatPhase = .standing
         } else if delta < -2 {
+            // Starting descent — reset per-rep error accumulators
+            if prevPhase == .standing {
+                repHadValgus      = false
+                repHadHeelLift    = false
+                repHadForwardLean = false
+                repValgusFrames   = 0
+                repBottomFrames   = 0
+            }
             squatPhase = .descending
         } else if delta > 2 {
             squatPhase = .ascending
         }
-        // Track minimum angle throughout the rep
+
         if squatPhase != .standing {
             squatMinAngle = min(squatMinAngle, avg)
         }
-        // Mark that the user has actually gone into a squat this rep
         if avg < 145 { squatHasDescended = true }
-
         squatPrevAngle = avg
 
-        let justReachedBottom = prevPhase == .descending && squatPhase == .ascending
-        let isSquatting       = squatPhase != .standing
+        // ── Accumulate per-rep error flags (only in bottom range) ─────────────
+        let isSquatting = squatPhase != .standing
+        if isSquatting && avg < 130 {
+            repBottomFrames += 1
 
-        // Suppress all errors until the first complete rep is confirmed.
-        guard squatRepConfirmed else { return [] }
-
-        // ── 1. Depth ────────────────────────────────────────────────────────
-        // Fired once per rep at the descending→ascending transition.
-        // Target: knee angle ≤ 90° (thighs parallel to floor).
-        if justReachedBottom && !squatDepthChecked {
-            squatDepthChecked = true
-            if squatMinAngle > 90 {
-                errors.append(FormError(
-                    message: "Недостаточная глубина — опустите бёдра до параллели с полом",
-                    severity: .warning))
-            }
-        }
-
-        // ── 2. Knee valgus (cave inward) ───────────────────────────────────
-        // Sign-convention-independent check: valgus means the knee X is
-        // closer to the centre (|knee.x| < |ankle.x|) because the ankle
-        // stays planted while the knee drifts inward toward x = 0.
-        // Works regardless of camera mirroring or MediaPipe's left/right labelling.
-        if isSquatting && avg < 145 {
+            // Valgus: knee closer to hip-centre than ankle is.
+            // Uses |x| so result is sign-convention independent.
             let hipW   = max(0.05, abs(lm(lms, .rightHip).x - lm(lms, .leftHip).x))
-            let thresh = hipW * 0.15
+            let thresh = hipW * 0.18
             let lCave  = abs(lm(lms, .leftKnee).x)  < abs(lm(lms, .leftAnkle).x)  - thresh
             let rCave  = abs(lm(lms, .rightKnee).x) < abs(lm(lms, .rightAnkle).x) - thresh
-            if lCave || rCave {
-                let phaseHint = squatPhase == .descending ? "на спуске" : "на подъёме"
-                errors.append(FormError(
-                    message: "Колени завалились внутрь \(phaseHint) — разведите их по носкам",
-                    severity: .critical))
-            }
+            if lCave || rCave { repValgusFrames += 1 }
+
+            // Heel lift
+            let lHeelUp = lm(lms, .leftHeel).y  - lm(lms, .leftFootIndex).y  > 0.04
+            let rHeelUp = lm(lms, .rightHeel).y - lm(lms, .rightFootIndex).y > 0.04
+            if lHeelUp || rHeelUp { repHadHeelLift = true }
+
+            // Forward lean
+            if spineLean(lms) > 50 { repHadForwardLean = true }
         }
 
-        // ── 3. Forward lean ────────────────────────────────────────────────
-        // Some lean is normal (20–40°). Over 50° is problematic.
-        // Check only while squatting — lean naturally increases at bottom.
-        if isSquatting && spineLean(lms) > 50 {
-            let phaseHint = squatPhase == .descending ? "на спуске" : "на подъёме"
+        // ── Emit errors only when the rep is completed ────────────────────────
+        guard squatRepConfirmed && repJustCompleted else { return [] }
+
+        var errors: [FormError] = []
+
+        // Depth: check the minimum angle reached this rep
+        if squatMinAngle > 90 {
             errors.append(FormError(
-                message: "Чрезмерный наклон корпуса вперёд \(phaseHint)",
+                message: "Недостаточная глубина — опустите бёдра до параллели с полом",
                 severity: .warning))
         }
 
-        // ── 4. Heel lift ───────────────────────────────────────────────────
-        // Only checked once the person is actually squatting (angle < 145°).
-        // Avoids false positives from natural sway while standing upright.
-        if isSquatting && avg < 145 {
-            let lHeelUp = lm(lms, .leftHeel).y  - lm(lms, .leftFootIndex).y  > 0.04
-            let rHeelUp = lm(lms, .rightHeel).y - lm(lms, .rightFootIndex).y > 0.04
-            if lHeelUp || rHeelUp {
-                errors.append(FormError(
-                    message: "Пятки отрываются от пола",
-                    severity: .critical))
-            }
+        // Valgus: only report if seen in >40% of bottom frames
+        if repBottomFrames > 0 && repValgusFrames > repBottomFrames * 2 / 5 {
+            errors.append(FormError(
+                message: "Колени завалились внутрь — разведите их по носкам",
+                severity: .critical))
+        }
+
+        if repHadForwardLean {
+            errors.append(FormError(
+                message: "Чрезмерный наклон корпуса вперёд",
+                severity: .warning))
+        }
+
+        if repHadHeelLift {
+            errors.append(FormError(
+                message: "Пятки отрывались от пола",
+                severity: .critical))
         }
 
         return errors
