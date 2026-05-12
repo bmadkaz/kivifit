@@ -5,7 +5,7 @@ import Combine
 @MainActor
 final class WorkoutViewModel: NSObject, ObservableObject {
     // MARK: - Published State
-    @Published var landmarks: [NormalizedLandmark] = []
+    @Published var landmarks: [PoseLandmark] = []
     @Published var currentError: String = ""
     @Published var fps: Int = 0
     @Published var processingStatus: String = "Инициализация..."
@@ -66,8 +66,8 @@ extension WorkoutViewModel: CameraManagerDelegate {
 // MARK: - PoseDetectorDelegate
 extension WorkoutViewModel: PoseDetectorDelegate {
     nonisolated func poseDetector(_ detector: PoseDetectorManager,
-                                   didDetect landmarks: [NormalizedLandmark],
-                                   worldLandmarks: [NormalizedLandmark]) {
+                                   didDetect landmarks: [PoseLandmark],
+                                   worldLandmarks: [PoseLandmark]) {
         Task { @MainActor [weak self] in
             guard let self else { return }
             self.landmarks = landmarks

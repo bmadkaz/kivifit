@@ -20,7 +20,7 @@ private let skeletonConnections: [(Int, Int)] = [
     (24, 26), (26, 28), (28, 30), (28, 32), (30, 32), // right leg
 ]
 
-struct NormalizedLandmark {
+struct PoseLandmark {
     var x: Float
     var y: Float
     var z: Float
@@ -29,7 +29,7 @@ struct NormalizedLandmark {
 }
 
 struct SkeletonOverlayView: View {
-    let landmarks: [NormalizedLandmark]
+    let landmarks: [PoseLandmark]
     let frameSize: CGSize
     let imageSize: CGSize
 

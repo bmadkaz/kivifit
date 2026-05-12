@@ -19,6 +19,8 @@
 		B010 /* VoiceCoach.swift */ = {isa = PBXBuildFile; fileRef = A010 /* VoiceCoach.swift */; };
 		B011 /* PermissionManager.swift */ = {isa = PBXBuildFile; fileRef = A011 /* PermissionManager.swift */; };
 		B012 /* WorkoutViewModel.swift */ = {isa = PBXBuildFile; fileRef = A012 /* WorkoutViewModel.swift */; };
+		C001 /* pose_landmarker_heavy.task */ = {isa = PBXBuildFile; fileRef = R001 /* pose_landmarker_heavy.task */; };
+		C002 /* pose_landmarker_lite.task */ = {isa = PBXBuildFile; fileRef = R002 /* pose_landmarker_lite.task */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -36,6 +38,8 @@
 		A012 /* WorkoutViewModel.swift */    = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkoutViewModel.swift; sourceTree = "<group>"; };
 		APPREF /* KiviFit.app */             = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = KiviFit.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		PLISTREF /* Info.plist */            = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = "Info.plist"; sourceTree = "<group>"; };
+		R001 /* pose_landmarker_heavy.task */ = {isa = PBXFileReference; lastKnownFileType = file; path = pose_landmarker_heavy.task; sourceTree = "<group>"; };
+		R002 /* pose_landmarker_lite.task */  = {isa = PBXFileReference; lastKnownFileType = file; path = pose_landmarker_lite.task; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -46,6 +50,18 @@
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXFrameworksBuildPhase section */
+
+/* Begin PBXResourcesBuildPhase section */
+		RESPHASE = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				C001,
+				C002,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
 
 /* Begin PBXGroup section */
 		MAINGROUP = {
@@ -60,6 +76,7 @@
 			isa = PBXGroup;
 			children = (
 				SRCGROUP,
+				RESGROUP,
 				SUPGROUP,
 			);
 			path = KiviFit;
@@ -108,6 +125,15 @@
 			path = Views;
 			sourceTree = "<group>";
 		};
+		RESGROUP = {
+			isa = PBXGroup;
+			children = (
+				R001,
+				R002,
+			);
+			path = Resources;
+			sourceTree = "<group>";
+		};
 		SUPGROUP = {
 			isa = PBXGroup;
 			children = (
@@ -128,7 +154,7 @@
 		TARGET1 = {
 			isa = PBXNativeTarget;
 			buildConfigurationList = BUILDCFGLIST;
-			buildPhases = (SRCPHASE, FRAMEPHASE);
+			buildPhases = (RESPHASE, SRCPHASE, FRAMEPHASE);
 			buildRules = ();
 			dependencies = ();
 			name = KiviFit;

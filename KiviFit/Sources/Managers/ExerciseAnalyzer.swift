@@ -37,7 +37,7 @@ final class ExerciseAnalyzer {
 
     // MARK: - Public
     func analyze(exercise: Exercise,
-                 landmarks: [NormalizedLandmark]) -> [FormError] {
+                 landmarks: [PoseLandmark]) -> [FormError] {
         guard landmarks.count >= 33 else { return [] }
         switch exercise {
         case .squat:          return analyzeSquat(landmarks)
@@ -50,26 +50,26 @@ final class ExerciseAnalyzer {
     }
 
     // MARK: - Angle Helpers
-    private func angle(a: NormalizedLandmark,
-                       b: NormalizedLandmark,
-                       c: NormalizedLandmark) -> Float {
+    private func angle(a: PoseLandmark,
+                       b: PoseLandmark,
+                       c: PoseLandmark) -> Float {
         let ba = SIMD3<Float>(a.x - b.x, a.y - b.y, a.z - b.z)
         let bc = SIMD3<Float>(c.x - b.x, c.y - b.y, c.z - b.z)
         let cosA = dot(ba, bc) / (length(ba) * length(bc) + 1e-8)
         return acos(max(-1, min(1, cosA))) * (180 / .pi)
     }
 
-    private func lm(_ landmarks: [NormalizedLandmark], _ index: LM) -> NormalizedLandmark {
+    private func lm(_ landmarks: [PoseLandmark], _ index: LM) -> PoseLandmark {
         landmarks[index.rawValue]
     }
 
-    private func midpoint(_ a: NormalizedLandmark, _ b: NormalizedLandmark) -> NormalizedLandmark {
-        NormalizedLandmark(x: (a.x+b.x)/2, y: (a.y+b.y)/2, z: (a.z+b.z)/2,
+    private func midpoint(_ a: PoseLandmark, _ b: PoseLandmark) -> PoseLandmark {
+        PoseLandmark(x: (a.x+b.x)/2, y: (a.y+b.y)/2, z: (a.z+b.z)/2,
                            visibility: min(a.visibility, b.visibility), presence: min(a.presence, b.presence))
     }
 
     // MARK: - Squat Analysis
-    private func analyzeSquat(_ lms: [NormalizedLandmark]) -> [FormError] {
+    private func analyzeSquat(_ lms: [PoseLandmark]) -> [FormError] {
         var errors: [FormError] = []
         let leftKneeAngle  = angle(a: lm(lms, .leftHip),  b: lm(lms, .leftKnee),  c: lm(lms, .leftAnkle))
         let rightKneeAngle = angle(a: lm(lms, .rightHip), b: lm(lms, .rightKnee), c: lm(lms, .rightAnkle))
@@ -105,7 +105,7 @@ final class ExerciseAnalyzer {
     }
 
     // MARK: - Push-Up Analysis
-    private func analyzePushUp(_ lms: [NormalizedLandmark]) -> [FormError] {
+    private func analyzePushUp(_ lms: [PoseLandmark]) -> [FormError] {
         var errors: [FormError] = []
         let leftElbowAngle  = angle(a: lm(lms, .leftShoulder),  b: lm(lms, .leftElbow),  c: lm(lms, .leftWrist))
         let rightElbowAngle = angle(a: lm(lms, .rightShoulder), b: lm(lms, .rightElbow), c: lm(lms, .rightWrist))
@@ -134,7 +134,7 @@ final class ExerciseAnalyzer {
     }
 
     // MARK: - Plank Analysis
-    private func analyzePlank(_ lms: [NormalizedLandmark]) -> [FormError] {
+    private func analyzePlank(_ lms: [PoseLandmark]) -> [FormError] {
         var errors: [FormError] = []
         let hipCenter = midpoint(lm(lms, .leftHip), lm(lms, .rightHip))
         let shoulderCenter = midpoint(lm(lms, .leftShoulder), lm(lms, .rightShoulder))
@@ -153,7 +153,7 @@ final class ExerciseAnalyzer {
     }
 
     // MARK: - Lunge Analysis
-    private func analyzeLunge(_ lms: [NormalizedLandmark]) -> [FormError] {
+    private func analyzeLunge(_ lms: [PoseLandmark]) -> [FormError] {
         var errors: [FormError] = []
         let frontKneeAngle = angle(a: lm(lms, .leftHip), b: lm(lms, .leftKnee), c: lm(lms, .leftAnkle))
 
@@ -174,7 +174,7 @@ final class ExerciseAnalyzer {
     }
 
     // MARK: - Deadlift Analysis
-    private func analyzeDeadlift(_ lms: [NormalizedLandmark]) -> [FormError] {
+    private func analyzeDeadlift(_ lms: [PoseLandmark]) -> [FormError] {
         var errors: [FormError] = []
         let hipCenter = midpoint(lm(lms, .leftHip), lm(lms, .rightHip))
         let shoulderCenter = midpoint(lm(lms, .leftShoulder), lm(lms, .rightShoulder))
@@ -196,7 +196,7 @@ final class ExerciseAnalyzer {
     }
 
     // MARK: - Shoulder Press Analysis
-    private func analyzeShoulderPress(_ lms: [NormalizedLandmark]) -> [FormError] {
+    private func analyzeShoulderPress(_ lms: [PoseLandmark]) -> [FormError] {
         var errors: [FormError] = []
         let leftPressAngle  = angle(a: lm(lms, .leftElbow),  b: lm(lms, .leftShoulder),  c: lm(lms, .leftHip))
         let rightPressAngle = angle(a: lm(lms, .rightElbow), b: lm(lms, .rightShoulder), c: lm(lms, .rightHip))

@@ -5,8 +5,8 @@ import MediaPipeTasksVision
 /// Delegate protocol for receiving pose detection results
 protocol PoseDetectorDelegate: AnyObject {
     func poseDetector(_ detector: PoseDetectorManager,
-                      didDetect landmarks: [NormalizedLandmark],
-                      worldLandmarks: [NormalizedLandmark])
+                      didDetect landmarks: [PoseLandmark],
+                      worldLandmarks: [PoseLandmark])
     func poseDetector(_ detector: PoseDetectorManager, didFailWithError error: Error)
 }
 
@@ -32,7 +32,7 @@ final class PoseDetectorManager: NSObject {
     private var poseLandmarker: PoseLandmarker?
     private var frameCounter: Int = 0
     private let processingQueue = DispatchQueue(label: "com.kivifit.pose", qos: .userInteractive)
-    private var smoothingBuffers: [[NormalizedLandmark]] = []
+    private var smoothingBuffers: [[PoseLandmark]] = []
     private var timestampMs: Int = 0
 
     // MARK: - Init
@@ -129,14 +129,14 @@ final class PoseDetectorManager: NSObject {
 
             // Convert MediaPipe landmarks to our model
             let normalized = poseLandmarks.map { lm in
-                NormalizedLandmark(
+                PoseLandmark(
                     x: lm.x, y: lm.y, z: lm.z,
                     visibility: lm.visibility?.floatValue ?? 0,
                     presence: lm.presence?.floatValue ?? 0
                 )
             }
             let world = worldLandmarks.map { lm in
-                NormalizedLandmark(
+                PoseLandmark(
                     x: lm.x, y: lm.y, z: lm.z,
                     visibility: lm.visibility?.floatValue ?? 0,
                     presence: lm.presence?.floatValue ?? 0
@@ -158,7 +158,7 @@ final class PoseDetectorManager: NSObject {
     }
 
     // MARK: - Smoothing (sliding window average)
-    private func applySmoothingFilter(to landmarks: [NormalizedLandmark]) -> [NormalizedLandmark] {
+    private func applySmoothingFilter(to landmarks: [PoseLandmark]) -> [PoseLandmark] {
         smoothingBuffers.append(landmarks)
         if smoothingBuffers.count > config.smoothingWindowSize {
             smoothingBuffers.removeFirst()
@@ -178,7 +178,7 @@ final class PoseDetectorManager: NSObject {
                 sumVis += frame[i].visibility
             }
             let n = Float(smoothingBuffers.count)
-            result[i] = NormalizedLandmark(
+            result[i] = PoseLandmark(
                 x: sumX / n, y: sumY / n, z: sumZ / n,
                 visibility: sumVis / n,
                 presence: landmarks[i].presence
