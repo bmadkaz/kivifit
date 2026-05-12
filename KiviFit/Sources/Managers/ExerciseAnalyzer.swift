@@ -150,11 +150,18 @@ final class ExerciseAnalyzer {
 
         var errors: [FormError] = []
 
-        // ── Depth: fire immediately when ascending starts ─────────────────────
-        if justReachedBottom && squatMinAngle > 90 {
-            errors.append(FormError(
-                message: "Недостаточная глубина — опустите бёдра до параллели с полом",
-                severity: .warning))
+        // ── Depth + lean: fire immediately when ascending starts ─────────────
+        if justReachedBottom {
+            if squatMinAngle > 90 {
+                errors.append(FormError(
+                    message: "Недостаточная глубина — опустите бёдра до параллели с полом",
+                    severity: .warning))
+            }
+            if repHadForwardLean {
+                errors.append(FormError(
+                    message: "Чрезмерный наклон корпуса вперёд",
+                    severity: .warning))
+            }
         }
 
         // ── Accumulate form flags in the bottom zone (avg < 130°) ─────────────
@@ -180,11 +187,6 @@ final class ExerciseAnalyzer {
                 errors.append(FormError(
                     message: "Колени завалились внутрь — разведите их по носкам",
                     severity: .critical))
-            }
-            if repHadForwardLean {
-                errors.append(FormError(
-                    message: "Чрезмерный наклон корпуса вперёд",
-                    severity: .warning))
             }
             if repHadHeelLift {
                 errors.append(FormError(
